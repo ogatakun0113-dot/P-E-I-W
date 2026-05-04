@@ -1,7 +1,7 @@
 import streamlit as st
 
 # --- ページ設定 ---
-st.set_page_config(page_title="消費電力計算アシスト", layout="centered")
+st.set_page_config(page_title="消費電力計算アシスト (進相/遅相対応)", layout="centered")
 
 # --- 見た目の設定（CSS） ---
 st.markdown("""
@@ -34,6 +34,7 @@ st.markdown("""
 st.markdown('<p class="credit">開発/制作：緒方</p>', unsafe_allow_html=True)
 
 st.title('⚡ 消費電力計算アシスト')
+st.caption("※力率 -1.0 〜 +1.0 (進相/遅相・回生) に対応")
 st.markdown("---")
 
 # --- 入力セクション ---
@@ -52,7 +53,7 @@ p_val, i_val, v_val, pf_val = 0.0, 0.0, 0.0, 1.0
 if mode == "電力を求める (P)":
     v_in = st.number_input("電圧 V (V)", value=100.0, step=1.0, format="%.1f")
     i_in = st.number_input("電流 I (A)", value=1.0, step=0.1, format="%.2f")
-    pf_in = st.number_input("力率 cosφ (0.0〜1.0)", value=1.0, min_value=0.0, max_value=1.0, step=0.01)
+    pf_in = st.number_input("力率 cosφ (-1.0〜+1.0)", value=1.0, min_value=-1.0, max_value=1.0, step=0.01)
     # P = V * I * pf
     p_val = v_in * i_in * pf_in
     v_val, i_val, pf_val = v_in, i_in, pf_in
@@ -60,25 +61,30 @@ if mode == "電力を求める (P)":
 elif mode == "電流を求める (I)":
     p_in = st.number_input("電力 P (W)", value=100.0, step=1.0, format="%.1f")
     v_in = st.number_input("電圧 V (V)", value=100.0, step=1.0, format="%.1f")
-    pf_in = st.number_input("力率 cosφ (0.0〜1.0)", value=1.0, min_value=0.1, max_value=1.0, step=0.01)
-    # I = P / (V * pf)
-    i_val = p_in / (v_in * pf_in) if v_in * pf_in != 0 else 0
+    pf_in = st.number_input("力率 cosφ (-1.0〜+1.0)", value=1.0, min_value=-1.0, max_value=1.0, step=0.01)
+    # I = P / (V * pf) ※絶対値で電流を算出
+    denom = v_in * pf_in
+    i_val = abs(p_in / denom) if denom != 0 else 0
     p_val, v_val, pf_val = p_in, v_in, pf_in
 
 elif mode == "電圧を求める (V)":
     p_in = st.number_input("電力 P (W)", value=100.0, step=1.0, format="%.1f")
     i_in = st.number_input("電流 I (A)", value=1.0, step=0.1, format="%.2f")
-    pf_in = st.number_input("力率 cosφ (0.0〜1.0)", value=1.0, min_value=0.1, max_value=1.0, step=0.01)
-    # V = P / (I * pf)
-    v_val = p_in / (i_in * pf_in) if i_in * pf_in != 0 else 0
+    pf_in = st.number_input("力率 cosφ (-1.0〜+1.0)", value=1.0, min_value=-1.0, max_value=1.0, step=0.01)
+    # V = P / (I * pf) ※絶対値で電圧を算出
+    denom = i_in * pf_in
+    v_val = abs(p_in / denom) if denom != 0 else 0
     p_val, i_val, pf_val = p_in, i_in, pf_in
 
 elif mode == "力率を求める (cosφ)":
     p_in = st.number_input("電力 P (W)", value=100.0, step=1.0, format="%.1f")
     v_in = st.number_input("電圧 V (V)", value=100.0, step=1.0, format="%.1f")
     i_in = st.number_input("電流 I (A)", value=1.2, step=0.1, format="%.2f")
-    # pf = P / (V * i)
+    # pf = P / (V * I)
     pf_val = p_in / (v_in * i_in) if v_in * i_in != 0 else 0
+    # 力率の範囲制限
+    if pf_val > 1.0: pf_val = 1.0
+    if pf_val < -1.0: pf_val = -1.0
     p_val, v_val, i_val = p_in, v_in, i_in
 
 # --- 結果表示 ---
@@ -95,5 +101,5 @@ with col2:
 
 # 皮相電力の参考表示
 s_val = v_val * i_val
-st.write(f"（参考）皮相電力: **{s_val:.2f} VA**")
+st.write(f"（参考）皮相電力: **{abs(s_val):.2f} VA**")
 st.markdown('</div>', unsafe_allow_html=True)
