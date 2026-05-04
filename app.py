@@ -1,7 +1,8 @@
 import streamlit as st
+import math
 
 # --- ページ設定 ---
-st.set_page_config(page_title="消費電力計算アシスト (進相/遅相対応)", layout="centered")
+st.set_page_config(page_title="消費電力計算アシスト (単相/三相対応)", layout="centered")
 
 # --- 見た目の設定（CSS） ---
 st.markdown("""
@@ -13,9 +14,9 @@ st.markdown("""
         color: #666;
         margin-bottom: -20px;
     }
-    /* 入力欄のラベルスタイル（青系） */
-    .stNumberInput label {
-        font-size: 20px !important;
+    /* 入力欄のラベルスタイル */
+    .stNumberInput label, .stSelectbox label {
+        font-size: 18px !important;
         color: #4169E1 !important;
         font-weight: 800 !important;
     }
@@ -34,72 +35,81 @@ st.markdown("""
 st.markdown('<p class="credit">開発/制作：緒方</p>', unsafe_allow_html=True)
 
 st.title('⚡ 消費電力計算アシスト')
-st.caption("※力率 -1.0 〜 +1.0 (進相/遅相・回生) に対応")
+st.caption("※単相・三相3線式、力率 -1.0 〜 +1.0 対応")
 st.markdown("---")
 
-# --- 入力セクション ---
-st.subheader("算出したい項目を選択してください")
-mode = st.radio(
-    "計算モード", 
-    ["電力を求める (P)", "電流を求める (I)", "電圧を求める (V)", "力率を求める (cosφ)"], 
-    horizontal=True
-)
+# --- 1. 方式選択 ---
+col_opt1, col_opt2 = st.columns(2)
+with col_opt1:
+    phase = st.selectbox("結線方式を選択", ["単相 (1Φ)", "三相 (3Φ3W)"])
+with col_opt2:
+    mode = st.selectbox(
+        "算出したい項目", 
+        ["電力を求める (P)", "電流を求める (I)", "電圧を求める (V)", "力率を求める (cosφ)"]
+    )
+
+# 三相の場合は係数を√3にする
+root3 = math.sqrt(3) if phase == "三相 (3Φ3W)" else 1.0
 
 st.markdown("---")
 
 # 初期値
 p_val, i_val, v_val, pf_val = 0.0, 0.0, 0.0, 1.0
 
+# --- 2. 入力セクション ---
 if mode == "電力を求める (P)":
-    v_in = st.number_input("電圧 V (V)", value=100.0, step=1.0, format="%.1f")
-    i_in = st.number_input("電流 I (A)", value=1.0, step=0.1, format="%.2f")
+    v_in = st.number_input("電圧 V (V)", value=200.0, step=1.0, format="%.1f")
+    i_in = st.number_input("電流 I (A)", value=10.0, step=0.1, format="%.2f")
     pf_in = st.number_input("力率 cosφ (-1.0〜+1.0)", value=1.0, min_value=-1.0, max_value=1.0, step=0.01)
-    # P = V * I * pf
-    p_val = v_in * i_in * pf_in
+    # P = √3 * V * I * pf
+    p_val = root3 * v_in * i_in * pf_in
     v_val, i_val, pf_val = v_in, i_in, pf_in
 
 elif mode == "電流を求める (I)":
-    p_in = st.number_input("電力 P (W)", value=100.0, step=1.0, format="%.1f")
-    v_in = st.number_input("電圧 V (V)", value=100.0, step=1.0, format="%.1f")
+    p_in = st.number_input("電力 P (W)", value=2000.0, step=1.0, format="%.1f")
+    v_in = st.number_input("電圧 V (V)", value=200.0, step=1.0, format="%.1f")
     pf_in = st.number_input("力率 cosφ (-1.0〜+1.0)", value=1.0, min_value=-1.0, max_value=1.0, step=0.01)
-    # I = P / (V * pf) ※絶対値で電流を算出
-    denom = v_in * pf_in
+    # I = P / (√3 * V * pf)
+    denom = root3 * v_in * pf_in
     i_val = abs(p_in / denom) if denom != 0 else 0
     p_val, v_val, pf_val = p_in, v_in, pf_in
 
 elif mode == "電圧を求める (V)":
-    p_in = st.number_input("電力 P (W)", value=100.0, step=1.0, format="%.1f")
-    i_in = st.number_input("電流 I (A)", value=1.0, step=0.1, format="%.2f")
+    p_in = st.number_input("電力 P (W)", value=2000.0, step=1.0, format="%.1f")
+    i_in = st.number_input("電流 I (A)", value=10.0, step=0.1, format="%.2f")
     pf_in = st.number_input("力率 cosφ (-1.0〜+1.0)", value=1.0, min_value=-1.0, max_value=1.0, step=0.01)
-    # V = P / (I * pf) ※絶対値で電圧を算出
-    denom = i_in * pf_in
+    # V = P / (√3 * I * pf)
+    denom = root3 * i_in * pf_in
     v_val = abs(p_in / denom) if denom != 0 else 0
     p_val, i_val, pf_val = p_in, i_in, pf_in
 
 elif mode == "力率を求める (cosφ)":
-    p_in = st.number_input("電力 P (W)", value=100.0, step=1.0, format="%.1f")
-    v_in = st.number_input("電圧 V (V)", value=100.0, step=1.0, format="%.1f")
-    i_in = st.number_input("電流 I (A)", value=1.2, step=0.1, format="%.2f")
-    # pf = P / (V * I)
-    pf_val = p_in / (v_in * i_in) if v_in * i_in != 0 else 0
-    # 力率の範囲制限
-    if pf_val > 1.0: pf_val = 1.0
-    if pf_val < -1.0: pf_val = -1.0
+    p_in = st.number_input("電力 P (W)", value=2000.0, step=1.0, format="%.1f")
+    v_in = st.number_input("電圧 V (V)", value=200.0, step=1.0, format="%.1f")
+    i_in = st.number_input("電流 I (A)", value=10.0, step=0.1, format="%.2f")
+    # pf = P / (√3 * V * I)
+    denom = root3 * v_in * i_in
+    pf_val = p_in / denom if denom != 0 else 0
+    # 範囲制限
+    pf_val = max(min(pf_val, 1.0), -1.0)
     p_val, v_val, i_val = p_in, v_in, i_in
 
-# --- 結果表示 ---
+# --- 3. 結果表示 ---
 st.markdown('<div class="result-box">', unsafe_allow_html=True)
-st.subheader("📊 計算・換算結果")
+st.subheader(f"📊 計算結果 ({phase})")
 
 col1, col2 = st.columns(2)
 with col1:
-    st.metric("電力 (P)", f"{p_val:.2f} W")
+    st.metric("有効電力 (P)", f"{p_val:,.2f} W")
     st.metric("電圧 (V)", f"{v_val:.1f} V")
 with col2:
     st.metric("電流 (I)", f"{i_val:.3f} A")
     st.metric("力率 (cosφ)", f"{pf_val:.2f}")
 
-# 皮相電力の参考表示
-s_val = v_val * i_val
-st.write(f"（参考）皮相電力: **{abs(s_val):.2f} VA**")
+# 皮相電力 S = √3 * V * I
+s_val = root3 * v_val * i_val
+st.write(f"（参考）皮相電力: **{abs(s_val):,.2f} VA**")
 st.markdown('</div>', unsafe_allow_html=True)
+
+if phase == "三相 (3Φ3W)":
+    st.caption("※三相の計算式: $P = \sqrt{3} \cdot V \cdot I \cdot \cos \phi$ を使用しています。")
