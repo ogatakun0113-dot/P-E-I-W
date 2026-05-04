@@ -1,0 +1,99 @@
+import streamlit as st
+
+# --- ページ設定 ---
+st.set_page_config(page_title="消費電力計算アシスト", layout="centered")
+
+# --- 見た目の設定（CSS） ---
+st.markdown("""
+    <style>
+    /* クレジット表示用のCSS */
+    .credit {
+        text-align: right;
+        font-size: 14px;
+        color: #666;
+        margin-bottom: -20px;
+    }
+    /* 入力欄のラベルスタイル（青系） */
+    .stNumberInput label {
+        font-size: 20px !important;
+        color: #4169E1 !important;
+        font-weight: 800 !important;
+    }
+    /* 計算結果ボックス */
+    .result-box {
+        background-color: #f0f2f6;
+        padding: 15px;
+        border-radius: 10px;
+        border-left: 5px solid #4169E1;
+        margin-top: 20px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# 右上にクレジットを表示
+st.markdown('<p class="credit">開発/制作：緒方</p>', unsafe_allow_html=True)
+
+st.title('⚡ 消費電力計算アシスト')
+st.markdown("---")
+
+# --- 入力セクション ---
+st.subheader("算出したい項目を選択してください")
+mode = st.radio(
+    "計算モード", 
+    ["電力を求める (P)", "電流を求める (I)", "電圧を求める (V)", "力率を求める (cosφ)"], 
+    horizontal=True
+)
+
+st.markdown("---")
+
+# 初期値
+p_val, i_val, v_val, pf_val = 0.0, 0.0, 0.0, 1.0
+
+if mode == "電力を求める (P)":
+    v_in = st.number_input("電圧 V (V)", value=100.0, step=1.0, format="%.1f")
+    i_in = st.number_input("電流 I (A)", value=1.0, step=0.1, format="%.2f")
+    pf_in = st.number_input("力率 cosφ (0.0〜1.0)", value=1.0, min_value=0.0, max_value=1.0, step=0.01)
+    # P = V * I * pf
+    p_val = v_in * i_in * pf_in
+    v_val, i_val, pf_val = v_in, i_in, pf_in
+
+elif mode == "電流を求める (I)":
+    p_in = st.number_input("電力 P (W)", value=100.0, step=1.0, format="%.1f")
+    v_in = st.number_input("電圧 V (V)", value=100.0, step=1.0, format="%.1f")
+    pf_in = st.number_input("力率 cosφ (0.0〜1.0)", value=1.0, min_value=0.1, max_value=1.0, step=0.01)
+    # I = P / (V * pf)
+    i_val = p_in / (v_in * pf_in) if v_in * pf_in != 0 else 0
+    p_val, v_val, pf_val = p_in, v_in, pf_in
+
+elif mode == "電圧を求める (V)":
+    p_in = st.number_input("電力 P (W)", value=100.0, step=1.0, format="%.1f")
+    i_in = st.number_input("電流 I (A)", value=1.0, step=0.1, format="%.2f")
+    pf_in = st.number_input("力率 cosφ (0.0〜1.0)", value=1.0, min_value=0.1, max_value=1.0, step=0.01)
+    # V = P / (I * pf)
+    v_val = p_in / (i_in * pf_in) if i_in * pf_in != 0 else 0
+    p_val, i_val, pf_val = p_in, i_in, pf_in
+
+elif mode == "力率を求める (cosφ)":
+    p_in = st.number_input("電力 P (W)", value=100.0, step=1.0, format="%.1f")
+    v_in = st.number_input("電圧 V (V)", value=100.0, step=1.0, format="%.1f")
+    i_in = st.number_input("電流 I (A)", value=1.2, step=0.1, format="%.2f")
+    # pf = P / (V * i)
+    pf_val = p_in / (v_in * i_in) if v_in * i_in != 0 else 0
+    p_val, v_val, i_val = p_in, v_in, i_in
+
+# --- 結果表示 ---
+st.markdown('<div class="result-box">', unsafe_allow_html=True)
+st.subheader("📊 計算・換算結果")
+
+col1, col2 = st.columns(2)
+with col1:
+    st.metric("電力 (P)", f"{p_val:.2f} W")
+    st.metric("電圧 (V)", f"{v_val:.1f} V")
+with col2:
+    st.metric("電流 (I)", f"{i_val:.3f} A")
+    st.metric("力率 (cosφ)", f"{pf_val:.2f}")
+
+# 皮相電力の参考表示
+s_val = v_val * i_val
+st.write(f"（参考）皮相電力: **{s_val:.2f} VA**")
+st.markdown('</div>', unsafe_allow_html=True)
